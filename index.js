@@ -1,4 +1,5 @@
 const { Telegraf } = require("telegraf");
+const express = require("express");
 const {
   GoogleGenerativeAI,
   HarmCategory,
@@ -46,30 +47,43 @@ async function sendWithTypingAnimation(ctx, text) {
   await ctx.reply(text);
 }
 
-bot.start((ctx) => ctx.reply("Welcome!"));
-
-bot.on("text", async (ctx) => {
+async function startBot() {
   try {
-    const chat = model.startChat({
-      generationConfig,
-      safetySettings,
-      history: [],
+    bot.start((ctx) => ctx.reply("Welcome!"));
+
+    bot.on("text", async (ctx) => {
+      const chat = model.startChat({
+        generationConfig,
+        safetySettings,
+        history: [],
+      });
+
+      const result = await chat.sendMessage(ctx.message.text);
+      const response = result.response;
+
+      await sendWithTypingAnimation(ctx, response.text());
     });
 
-    const result = await chat.sendMessage(ctx.message.text);
-    const response = result.response;
-
-    await sendWithTypingAnimation(ctx, response.text());
+    bot.launch();
   } catch (error) {
     console.error("An error occurred:", error);
-
-    // Restart the bot or take appropriate actions here
-    // You might want to use process.exit() or other restart mechanisms
-    // For simplicity, let's restart the bot using Telegraf's stop() and launch() methods
-    await ctx.reply("An error occurred. Restarting...");
-    await bot.stop();
-    bot.launch();
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await startBot();
   }
+}
+
+// Setup Express server for keep-alive endpoint
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("Bot is alive!");
 });
 
-bot.launch();
+// Start Express server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+// Start the bot initially
+startBot();
